@@ -52,6 +52,7 @@ HID_BACKSPACE = 0x2A
 HID_LSHIFT = 0x02  # modifier bit, not a keycode
 
 MOD_LSHIFT = 0x02
+MOD_LGUI = 0x08
 
 # key -> (keycode, needs_shift)
 KEYCODE = {
@@ -69,8 +70,9 @@ KEYCODE = {
     ',<': (0x36, False), '-=': (0x2D, False), '.>': (0x37, False), '/?': (0x38, False),
     'UP': (HID_UP, False), 'DWN': (HID_DOWN, False), 'LFT': (HID_BACKSPACE, False),
     'RGT': (HID_RIGHT, False), 'SPACE': (HID_SPACE, False),
-    'ENT': (HID_ENTER, False), 'CLR': (HID_ESC, False), 'BRK': (HID_ESC, False),
+    'ENT': (HID_ENTER, False), 'CLR': (None, False), 'BRK': (HID_ESC, False),
     'SHIFT': (None, False),  # handled as a modifier, not a keystroke
+    'COMMAND': (None, False),  # CLR repurposed as Command modifier
 }
 
 # ---------------------------------------------------------------------------
@@ -150,21 +152,35 @@ def main():
 
                 if pressed != prev_pressed:
                     newly_pressed = pressed - prev_pressed
-                    if newly_pressed:
-                        row_i, col_i = next(iter(newly_pressed))
+                    for (row_i, col_i) in newly_pressed:
                         label = MATRIX_KEYS[row_i][col_i]
-                        if label and label != 'SHIFT':
+                        if label and label not in ('SHIFT', 'CLR'):
+                            shift_held = any(
+                                MATRIX_KEYS[r][c] == 'SHIFT' for (r, c) in pressed
+                            )
+                            command_held = any(
+                                MATRIX_KEYS[r][c] == 'CLR' for (r, c) in pressed
+                            )
+                            space_held = any(
+                                MATRIX_KEYS[r][c] == 'SPACE' for (r, c) in pressed
+                            )
+                            # Shift+Space acts as an extra Command trigger (for
+                            # macOS screenshot shortcuts like Cmd+Shift+4).
+                            # Don't fire Space's own keystroke in that case.
+                            if label == 'SPACE' and shift_held:
+                                continue
                             entry = KEYCODE.get(label)
                             if entry:
                                 keycode, needs_shift = entry
-                                shift_held = any(
-                                    MATRIX_KEYS[r][c] == 'SHIFT' for (r, c) in pressed
-                                )
-                                modifier = MOD_LSHIFT if (needs_shift or shift_held) else 0
+                                modifier = 0
+                                if needs_shift or shift_held:
+                                    modifier |= MOD_LSHIFT
+                                if command_held or (shift_held and space_held):
+                                    modifier |= MOD_LGUI
                                 send_hid_report(hidg, modifier, keycode)
                                 time.sleep(DEBOUNCE_SEC)
                                 release_all(hidg)
-                    elif not pressed:
+                    if not pressed:
                         release_all(hidg)
 
                 prev_pressed = pressed
