@@ -48,6 +48,7 @@ HID_UP = 0x52
 HID_DOWN = 0x51
 HID_LEFT = 0x50
 HID_RIGHT = 0x4F
+HID_BACKSPACE = 0x2A
 HID_LSHIFT = 0x02  # modifier bit, not a keycode
 
 MOD_LSHIFT = 0x02
@@ -66,9 +67,9 @@ KEYCODE = {
     '4$': (0x21, False), '5%': (0x22, False), '6&': (0x23, False), '7\'': (0x24, False),
     '8(': (0x25, False), '9)': (0x26, False), ':*': (0x33, True), ';+': (0x33, False),
     ',<': (0x36, False), '-=': (0x2D, False), '.>': (0x37, False), '/?': (0x38, False),
-    'UP': (HID_UP, False), 'DWN': (HID_DOWN, False), 'LFT': (HID_LEFT, False),
+    'UP': (HID_UP, False), 'DWN': (HID_DOWN, False), 'LFT': (HID_BACKSPACE, False),
     'RGT': (HID_RIGHT, False), 'SPACE': (HID_SPACE, False),
-    'ENT': (HID_ENTER, False), 'CLR': (HID_ESC, False), 'BRK': (0x48, False),
+    'ENT': (HID_ENTER, False), 'CLR': (HID_ESC, False), 'BRK': (HID_ESC, False),
     'SHIFT': (None, False),  # handled as a modifier, not a keystroke
 }
 
