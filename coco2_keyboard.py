@@ -40,7 +40,7 @@ POLL_SEC = 0.01
 # ---------------------------------------------------------------------------
 
 HID_A = 0x04
-HID_1 = 0x1E
+HID_TAB = 0x2B
 HID_ENTER = 0x28
 HID_ESC = 0x29
 HID_SPACE = 0x2C
@@ -49,31 +49,65 @@ HID_DOWN = 0x51
 HID_LEFT = 0x50
 HID_RIGHT = 0x4F
 HID_BACKSPACE = 0x2A
-HID_LSHIFT = 0x02  # modifier bit, not a keycode
 
 MOD_LSHIFT = 0x02
 MOD_LGUI = 0x08
 
-# key -> (keycode, needs_shift)
+# ---------------------------------------------------------------------------
+# Key mapping
+#
+# The host applies a US layout to whatever we send, and several of the CoCo's
+# shifted characters sit on *different* physical keys in US layout. So Shift
+# cannot simply be passed through -- each key gets an explicit unshifted and
+# shifted target.
+#
+#   label -> ((keycode, modifier) unshifted, (keycode, modifier) shifted)
+#
+# The modifier here is what a US host needs to produce the character printed
+# on the CoCo keycap, not the state of the CoCo's own Shift key.
+# ---------------------------------------------------------------------------
+
+
+def _letter(ch):
+    """Letters: same keycode both ways, Shift just capitalizes."""
+    code = HID_A + (ord(ch) - ord('A'))
+    return ((code, 0), (code, MOD_LSHIFT))
+
+
 KEYCODE = {
-    '@': (0x1F, True),  # placeholder; CoCo's '@' varies by layout, adjust after testing
-    'A': (0x04, False), 'B': (0x05, False), 'C': (0x06, False), 'D': (0x07, False),
-    'E': (0x08, False), 'F': (0x09, False), 'G': (0x0A, False), 'H': (0x0B, False),
-    'I': (0x0C, False), 'J': (0x0D, False), 'K': (0x0E, False), 'L': (0x0F, False),
-    'M': (0x10, False), 'N': (0x11, False), 'O': (0x12, False), 'P': (0x13, False),
-    'Q': (0x14, False), 'R': (0x15, False), 'S': (0x16, False), 'T': (0x17, False),
-    'U': (0x18, False), 'V': (0x19, False), 'W': (0x1A, False), 'X': (0x1B, False),
-    'Y': (0x1C, False), 'Z': (0x1D, False),
-    '0': (0x27, False), '1!': (0x1E, False), '2"': (0x1F, False), '3#': (0x20, False),
-    '4$': (0x21, False), '5%': (0x22, False), '6&': (0x23, False), '7\'': (0x24, False),
-    '8(': (0x25, False), '9)': (0x26, False), ':*': (0x33, True), ';+': (0x33, False),
-    ',<': (0x36, False), '-=': (0x2D, False), '.>': (0x37, False), '/?': (0x38, False),
-    'UP': (HID_UP, False), 'DWN': (HID_DOWN, False), 'LFT': (HID_BACKSPACE, False),
-    'RGT': (HID_RIGHT, False), 'SPACE': (HID_SPACE, False),
-    'ENT': (HID_ENTER, False), 'CLR': (None, False), 'BRK': (HID_ESC, False),
-    'SHIFT': (None, False),  # handled as a modifier, not a keystroke
-    'COMMAND': (None, False),  # CLR repurposed as Command modifier
+    #  label        unshifted              shifted            CoCo cap  (US source)
+    '@':  ((0x1F, MOD_LSHIFT), (0x1F, MOD_LSHIFT)),        # @   @      shift+2
+    '0':  ((0x27, 0),          (0x27, 0)),                 # 0   -      no shifted char
+    '1!': ((0x1E, 0),          (0x1E, MOD_LSHIFT)),        # 1   !      shift+1
+    '2"': ((0x1F, 0),          (0x34, MOD_LSHIFT)),        # 2   "      shift+'
+    '3#': ((0x20, 0),          (0x20, MOD_LSHIFT)),        # 3   #      shift+3
+    '4$': ((0x21, 0),          (0x21, MOD_LSHIFT)),        # 4   $      shift+4
+    '5%': ((0x22, 0),          (0x22, MOD_LSHIFT)),        # 5   %      shift+5
+    '6&': ((0x23, 0),          (0x24, MOD_LSHIFT)),        # 6   &      shift+7
+    "7'": ((0x24, 0),          (0x34, 0)),                 # 7   '      bare '
+    '8(': ((0x25, 0),          (0x26, MOD_LSHIFT)),        # 8   (      shift+9
+    '9)': ((0x26, 0),          (0x27, MOD_LSHIFT)),        # 9   )      shift+0
+    ':*': ((0x33, MOD_LSHIFT), (0x25, MOD_LSHIFT)),        # :   *      shift+; / shift+8
+    '-=': ((0x2D, 0),          (0x2E, 0)),                 # -   =      bare =
+    ';+': ((0x33, 0),          (0x2E, MOD_LSHIFT)),        # ;   +      shift+=
+    ',<': ((0x36, 0),          (0x36, MOD_LSHIFT)),        # ,   <      shift+,
+    '.>': ((0x37, 0),          (0x37, MOD_LSHIFT)),        # .   >      shift+.
+    '/?': ((0x38, 0),          (0x38, MOD_LSHIFT)),        # /   ?      shift+/
+
+    'UP':    ((HID_UP, 0),        (HID_TAB, 0)),  # Shift+Up -> Tab
+    'DWN':   ((HID_DOWN, 0),      (HID_DOWN, MOD_LSHIFT)),
+    'LFT':   ((HID_BACKSPACE, 0), (HID_BACKSPACE, MOD_LSHIFT)),
+    'RGT':   ((HID_RIGHT, 0),     (HID_RIGHT, MOD_LSHIFT)),
+    'SPACE': ((HID_SPACE, 0),     (HID_SPACE, MOD_LSHIFT)),
+    'ENT':   ((HID_ENTER, 0),     (HID_ENTER, MOD_LSHIFT)),
+    'BRK':   ((HID_ESC, 0),       (HID_ESC, MOD_LSHIFT)),
+
+    'CLR':     None,  # repurposed as the Command modifier
+    'SHIFT':   None,  # handled as a modifier, not a keystroke
+    'COMMAND': None,
 }
+
+KEYCODE.update({ch: _letter(ch) for ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'})
 
 # ---------------------------------------------------------------------------
 # Matrix -> key label, from the CoCo2 connector diagram
@@ -86,7 +120,7 @@ MATRIX_KEYS = [
     ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'],            # row pin 2
     ['P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W'],            # row pin 4
     ['X', 'Y', 'Z', 'UP', 'DWN', 'LFT', 'RGT', 'SPACE'], # row pin 5
-    ['0', '1!', '2"', '3#', '4$', '5%', '6&', '7\''],    # row pin 6
+    ['0', '1!', '2"', '3#', '4$', '5%', '6&', "7'"],     # row pin 6
     ['8(', '9)', ':*', ';+', ',<', '-=', '.>', '/?'],    # row pin 7
     ['ENT', 'CLR', 'BRK', None, None, None, None, 'SHIFT'],  # row pin 8 (CoCo2: no Alt/Ctrl/F1/F2)
 ]
@@ -94,6 +128,7 @@ MATRIX_KEYS = [
 # ---------------------------------------------------------------------------
 # GPIO setup
 # ---------------------------------------------------------------------------
+
 
 def setup_gpio():
     GPIO.setmode(GPIO.BCM)
@@ -122,6 +157,7 @@ def scan_matrix():
 # HID output
 # ---------------------------------------------------------------------------
 
+
 def send_hid_report(hidg, modifier, keycode):
     """Writes one 8-byte boot-keyboard HID report."""
     report = bytearray(8)
@@ -136,9 +172,32 @@ def release_all(hidg):
     send_hid_report(hidg, 0, 0)
 
 
+def resolve(label, shift_held, gui_held):
+    """Returns (keycode, modifier) for a key press, or None if it emits nothing."""
+    entry = KEYCODE.get(label)
+    if not entry:
+        return None
+
+    unshifted, shifted = entry
+
+    if gui_held:
+        # Shortcuts key off physical keys, not printed characters, so send the
+        # base keycode and let Shift ride along as a plain modifier. Otherwise
+        # Cmd+Shift+4 would go out as Cmd+Shift+$-on-some-other-key.
+        keycode, modifier = unshifted
+        if shift_held:
+            modifier |= MOD_LSHIFT
+        modifier |= MOD_LGUI
+    else:
+        keycode, modifier = shifted if shift_held else unshifted
+
+    return keycode, modifier
+
+
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
+
 
 def main():
     setup_gpio()
@@ -152,34 +211,34 @@ def main():
 
                 if pressed != prev_pressed:
                     newly_pressed = pressed - prev_pressed
+                    shift_held = any(
+                        MATRIX_KEYS[r][c] == 'SHIFT' for (r, c) in pressed
+                    )
+                    command_held = any(
+                        MATRIX_KEYS[r][c] == 'CLR' for (r, c) in pressed
+                    )
+                    space_held = any(
+                        MATRIX_KEYS[r][c] == 'SPACE' for (r, c) in pressed
+                    )
+                    # Shift+Space acts as an extra Command trigger (for
+                    # macOS screenshot shortcuts like Cmd+Shift+4).
+                    gui_held = command_held or (shift_held and space_held)
+
                     for (row_i, col_i) in newly_pressed:
                         label = MATRIX_KEYS[row_i][col_i]
-                        if label and label not in ('SHIFT', 'CLR'):
-                            shift_held = any(
-                                MATRIX_KEYS[r][c] == 'SHIFT' for (r, c) in pressed
-                            )
-                            command_held = any(
-                                MATRIX_KEYS[r][c] == 'CLR' for (r, c) in pressed
-                            )
-                            space_held = any(
-                                MATRIX_KEYS[r][c] == 'SPACE' for (r, c) in pressed
-                            )
-                            # Shift+Space acts as an extra Command trigger (for
-                            # macOS screenshot shortcuts like Cmd+Shift+4).
-                            # Don't fire Space's own keystroke in that case.
-                            if label == 'SPACE' and shift_held:
-                                continue
-                            entry = KEYCODE.get(label)
-                            if entry:
-                                keycode, needs_shift = entry
-                                modifier = 0
-                                if needs_shift or shift_held:
-                                    modifier |= MOD_LSHIFT
-                                if command_held or (shift_held and space_held):
-                                    modifier |= MOD_LGUI
-                                send_hid_report(hidg, modifier, keycode)
-                                time.sleep(DEBOUNCE_SEC)
-                                release_all(hidg)
+                        if not label or label in ('SHIFT', 'CLR'):
+                            continue
+                        # Don't fire Space's own keystroke when it's acting
+                        # as the Command trigger.
+                        if label == 'SPACE' and shift_held:
+                            continue
+                        result = resolve(label, shift_held, gui_held)
+                        if result:
+                            keycode, modifier = result
+                            send_hid_report(hidg, modifier, keycode)
+                            time.sleep(DEBOUNCE_SEC)
+                            release_all(hidg)
+
                     if not pressed:
                         release_all(hidg)
 
